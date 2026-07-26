@@ -1,0 +1,265 @@
+1. High-Level Overview (30 seconds)
+
+"Sleep Detector is a Windows desktop application that continuously monitors the user's face through the webcam. It uses MediaPipe Face Landmarker to detect facial landmarks around the eyes in real time. By calculating the Eye Aspect Ratio (EAR), it determines whether the eyes are open or closed. If the eyes remain closed beyond a predefined threshold, the application considers the user drowsy and plays an alarm. The application runs in the background using a system tray icon and can be installed like a normal Windows application."
+
+2. Overall Architecture
+User
+   │
+   ▼
+SleepDetector.exe
+   │
+   ▼
+GUI (CustomTkinter)
+   │
+   ▼
+Activate Button
+   │
+   ▼
+Background Detection Thread
+   │
+   ▼
+OpenCV
+   │
+   ▼
+Webcam Frames
+   │
+   ▼
+MediaPipe Face Landmarker
+   │
+   ▼
+468 Facial Landmarks
+   │
+   ▼
+Eye Landmark Extraction
+   │
+   ▼
+Eye Aspect Ratio (EAR)
+   │
+   ▼
+Eyes Closed?
+   │
+   ▼
+Timer
+   │
+   ▼
+Alarm (pygame)
+3. Explain each module
+main.py
+
+"main.py is the bootstrap file. It creates all the application components, connects them together, starts the GUI, launches the system tray, and ensures that everything shuts down safely when the user exits."
+
+gui.py
+
+"This module contains the graphical interface built with CustomTkinter. It lets the user start or stop monitoring, displays logs, and changes settings."
+
+detector.py
+
+"This is the core of the application. It captures webcam frames using OpenCV, sends them to MediaPipe for face landmark detection, calculates the eye state, and triggers the alarm if drowsiness is detected."
+
+tray.py
+
+"This module creates the Windows system tray icon using pystray. It allows the application to keep running in the background even when the main window is hidden."
+
+logger.py
+
+"It records important events such as monitoring started, sleep detected, user awake, and monitoring stopped into a log file."
+
+settings_manager.py
+
+"This module reads and writes the application's configuration, such as alarm settings and thresholds, to a JSON file."
+
+4. Detection Pipeline
+
+This is where interviewers spend most of their time.
+
+Step 1
+
+User presses
+
+Activate
+Step 2
+
+The GUI creates a background thread.
+
+"I used a background thread so the GUI remains responsive while face detection runs continuously."
+
+Step 3
+
+OpenCV opens the webcam.
+
+cap = cv2.VideoCapture(0)
+
+Every loop:
+
+Frame 1
+
+Frame 2
+
+Frame 3
+
+...
+
+30 FPS
+Step 4
+
+Each frame goes to MediaPipe.
+
+Camera Frame
+
+↓
+
+MediaPipe
+
+↓
+
+Face Detection
+
+↓
+
+468 Landmarks
+Step 5
+
+MediaPipe returns landmark coordinates.
+
+For example:
+
+Left Eye
+
+33
+
+160
+
+158
+
+133
+
+153
+
+144
+
+Those numbers correspond to points around the eye.
+
+Step 6
+
+Only eye landmarks are selected.
+
+The rest of the face is ignored.
+
+468 Landmarks
+
+↓
+
+6 Left Eye
+
+↓
+
+6 Right Eye
+Step 7
+
+Eye Aspect Ratio (EAR) is calculated.
+
+Eye Open
+
+EAR = 0.32
+
+↓
+
+Eye Closed
+
+EAR = 0.11
+
+If
+
+EAR < Threshold
+
+then
+
+Eyes Closed
+Step 8
+
+A timer starts.
+
+Eyes Closed
+
+↓
+
+1 sec
+
+↓
+
+2 sec
+
+↓
+
+3 sec
+
+If the user opens their eyes before the threshold time, the timer resets.
+
+Step 9
+
+If the timer exceeds the configured duration,
+
+Sleep Detected
+Step 10
+
+pygame plays
+
+alarm.wav
+
+The user wakes up.
+
+5. Why use a background thread?
+
+A common interview question.
+
+Without a thread:
+
+GUI
+
+↓
+
+Detection
+
+↓
+
+GUI Freezes
+
+With a thread:
+
+Main Thread
+
+↓
+
+GUI
+
+---------------
+
+Thread 2
+
+↓
+
+Detection
+
+Now both run simultaneously.
+
+6. Why use MediaPipe instead of Haar Cascade?
+
+"Haar Cascade only detects the face or eyes as rectangular regions. MediaPipe provides precise facial landmarks with hundreds of key points, allowing accurate eye state estimation."
+
+7. Why use OpenCV?
+
+"OpenCV handles webcam access, image capture, frame processing, and basic computer vision operations before the frames are analysed by MediaPipe."
+
+8. Why use PyInstaller?
+
+"PyInstaller packages the Python application along with its dependencies into a standalone executable, allowing users to run it without installing Python."
+
+9. Why use Inno Setup?
+
+"Inno Setup creates a professional Windows installer. It copies the application into Program Files, creates desktop and Start Menu shortcuts, and registers uninstall information, making installation similar to commercial Windows applications."
+
+10. Complete Flow (Best Answer)
+
+If an interviewer asks "How does your project work?", you can say:
+
+"The user launches the application and clicks Activate. The GUI starts a background detection thread so the interface remains responsive. The thread captures webcam frames using OpenCV and sends each frame to MediaPipe Face Landmarker. MediaPipe detects facial landmarks and returns landmark coordinates. My application extracts only the eye landmarks and computes the Eye Aspect Ratio to determine whether the eyes are open or closed. If the eyes remain closed continuously beyond the configured threshold, the application classifies it as drowsiness and plays an alarm using pygame. The application runs in the Windows system tray, allowing monitoring in the background. Finally, I packaged it as a standalone executable with PyInstaller and distributed it through an installer built using Inno Setup."
