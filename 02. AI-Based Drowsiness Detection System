@@ -1,0 +1,430 @@
+AI-Based Drowsiness Detection System
+Part 2 (Questions 21–40)
+Q21. Explain your code flow line by line.
+Answer
+
+When the program starts, it first imports all the required libraries:
+
+OpenCV for webcam access and displaying frames.
+NumPy for mathematical operations.
+time to measure how long the eyes remain closed.  
+pygame to play the alarm sound.
+MediaPipe for face detection and facial landmark prediction.
+
+After importing, I initialize the MediaPipe Face Landmarker using the .task model file.
+
+Next, I initialize the Pygame mixer so the audio engine is ready before any detection occurs.
+
+Then I open the webcam using cv2.VideoCapture(0).
+
+Inside the infinite loop:
+
+Capture one frame.
+Convert BGR → RGB.
+Pass the RGB frame to MediaPipe.
+Get facial landmarks.
+Extract eye landmarks.
+Calculate whether the eyes are open or closed.
+Update the timer.
+Play or stop the alarm.
+Draw landmarks and status text.
+Display the frame.
+
+The loop repeats until the user presses Q.
+
+Follow-up
+
+Why do we initialise everything before entering the loop?
+
+Because model loading, audio initialisation, and webcam setup are expensive operations. Initialising them once avoids unnecessary overhead and keeps the application fast.
+
+Q22. Why do you use an infinite loop?
+Answer
+
+A webcam continuously generates frames.
+
+Unlike image processing, where only one image is analysed, a real-time application must process frames continuously.
+
+The infinite loop allows the application to:
+
+Read a frame
+Process it
+Display it
+Repeat
+
+Without this loop, the application would process only a single frame and then terminate.
+
+Follow-up
+
+Won't an infinite loop consume all CPU resources?
+
+It can if not handled carefully.
+
+However:
+
+Camera FPS naturally limits execution.
+MediaPipe processing takes time.
+The loop exits when the user presses Q.
+
+So CPU usage remains manageable.
+
+Q23. Why do you check the return value (ret) after reading a frame?
+Answer
+
+ret indicates whether the webcam successfully captured a frame.
+
+If ret is False, it means:
+
+Camera disconnected
+Camera busy
+Hardware failure
+Frame capture failed
+
+Processing an invalid frame would lead to exceptions or crashes.
+
+Therefore I immediately stop processing if ret == False.
+
+This is good defensive programming.
+
+Follow-up
+
+What happens if you ignore ret?
+
+Functions like cv2.cvtColor() will receive None instead of an image and raise an exception.
+
+Q24. Why do you convert the frame to a MediaPipe Image object?
+Answer
+
+MediaPipe Tasks API does not directly accept a NumPy array.
+
+It expects a mediapipe.Image.
+
+This object stores:
+
+image format
+width
+height
+pixel data
+
+Converting to this format ensures compatibility with the MediaPipe inference pipeline.
+
+Follow-up
+
+Why didn't older MediaPipe versions require this?
+
+Older APIs directly accepted NumPy arrays.
+
+The newer Tasks API introduces a standardised image abstraction for better consistency across different platforms.
+
+Q25. Why don't you create the FaceLandmarker inside the loop?
+Answer
+
+Creating the model is computationally expensive.
+
+If I initialise it inside the loop:
+
+Model loads every frame.
+Memory allocations happen repeatedly.
+FPS drops dramatically.
+CPU usage increases.
+
+Therefore I initialise the model only once before entering the processing loop.
+
+Interviewer says:
+
+Suppose you initialise it every frame.
+
+What happens?
+
+The application becomes extremely slow because model loading is much slower than inference.
+
+Q26. What exactly is happening during inference?
+Answer
+
+Inference means running a trained neural network on new input data.
+
+For every frame:
+
+The RGB image is fed into the trained model.
+The model performs forward propagation.
+Features are extracted.
+The network predicts landmark coordinates.
+The predicted landmarks are returned.
+
+No learning happens during inference.
+
+The model parameters remain unchanged.
+
+Follow-up
+
+Difference between training and inference?
+
+Training updates weights.
+
+Inference only uses learned weights.
+
+Q27. Why is inference slower than normal OpenCV operations?
+Answer
+
+OpenCV operations such as drawing circles or converting colour spaces are algorithmic image-processing operations.
+
+MediaPipe inference runs a deep neural network.
+
+Neural networks perform:
+
+Matrix multiplication
+Convolution
+Activation functions
+
+These computations are much heavier than simple OpenCV functions.
+
+Therefore inference consumes more CPU time.
+
+Q28. How many landmarks does MediaPipe return?
+Answer
+
+The Face Landmarker predicts 478 landmarks in the latest models.
+
+These include:
+
+Eyes
+Eyebrows
+Nose
+Lips
+Chin
+Face contour
+Iris landmarks
+
+Each landmark has:
+
+x
+y
+z
+
+coordinates.
+
+Follow-up
+
+Did you use all 478?
+
+No.
+
+I extracted only the eye landmarks because my application only needs information related to eye closure.
+
+Q29. Why don't you simply crop the eye image and classify it using CNN?
+Answer
+
+That is another valid approach.
+
+However it requires:
+
+Dataset
+Manual labelling
+Model training
+Model evaluation
+Deployment
+
+MediaPipe already provides highly accurate eye landmarks.
+
+Therefore I don't need to build another CNN from scratch.
+
+This reduces complexity while maintaining excellent performance.
+
+Q30. Explain how your eye detection logic works.
+Answer
+
+MediaPipe provides predefined landmark indices corresponding to both eyes.
+
+Using those indices:
+
+I retrieve the eye landmark coordinates.
+I analyse the relative positions of the eyelids.
+If the upper and lower eyelids come very close together, the eye is considered closed.
+If the distance remains sufficiently large, the eye is considered open.
+
+Instead of relying on pixel colours, the decision is based on facial geometry, making it more robust to different skin tones and lighting conditions.
+
+Follow-up
+
+Why not detect eye colour?
+
+Because eye colour has no relationship with whether the eyes are open or closed.
+
+Q31. Why do you measure time instead of counting frames?
+Answer
+
+Frame count depends on FPS.
+
+Example:
+
+30 frames
+
+means:
+
+1 second at 30 FPS
+0.5 seconds at 60 FPS
+2 seconds at 15 FPS
+
+This makes frame counting unreliable.
+
+Time measurement is independent of FPS.
+
+Therefore it provides consistent behaviour across different computers.
+
+Interviewer Follow-up
+
+Which approach is better?
+
+Time-based detection.
+
+Q32. Why did you use Python's time module?
+Answer
+
+The time module provides accurate timestamps.
+
+Whenever the eyes first close, I record the current time.
+
+As long as the eyes remain closed, I calculate:
+
+Current Time − Start Time
+
+If the elapsed duration exceeds my threshold, I classify the user as drowsy.
+
+When the eyes open again, I reset the timer.
+
+This makes the detection stable and independent of processing speed.
+
+Q33. Why do you reset the timer after opening the eyes?
+Answer
+
+Suppose someone closes their eyes for one second.
+
+Later they blink normally.
+
+If I don't reset the timer, the old value continues accumulating.
+
+Eventually, even a normal blink could trigger the alarm.
+
+Resetting ensures each closed-eye event is evaluated independently.
+
+Q34. Why did you choose Pygame for audio?
+Answer
+
+Pygame provides a lightweight audio engine that is easy to integrate into Python applications.
+
+Advantages include:
+
+Fast initialisation
+Non-blocking playback
+Simple API
+Supports common audio formats
+Minimal dependencies
+
+For a real-time application, it allows the alarm to play without interrupting the video processing loop.
+
+Follow-up
+
+Why not use playsound()?
+
+Because playsound() is blocking in many implementations.
+
+It pauses program execution until playback finishes.
+
+That would freeze the webcam stream.
+
+Pygame plays audio asynchronously.
+
+Q35. Why don't you call play() every frame?
+Answer
+
+Suppose the application runs at 30 FPS.
+
+Calling play() every frame means 30 play requests per second.
+
+This causes:
+
+Audio overlap
+Distorted sound
+Increased CPU usage
+Repeated restarting of the alarm
+
+Instead, I first check whether the alarm is already playing.
+
+Only if it is not playing do I start playback.
+
+Interviewer Follow-up
+
+How do you know if it's already playing?
+
+Using Pygame's audio channel state or maintaining a Boolean flag indicating whether the alarm has already been triggered.
+
+Q36. Why stop the alarm immediately when the eyes open?
+Answer
+
+The objective of the alarm is to alert the user while they are drowsy.
+
+Once the eyes reopen, the alert is no longer necessary.
+
+Stopping the alarm immediately prevents unnecessary noise and improves the user experience.
+
+It also prepares the system for future drowsiness events.
+
+Q37. How would you calculate FPS?
+Answer
+
+FPS stands for Frames Per Second.
+
+It represents how many frames the application processes every second.
+
+A common method is:
+
+FPS = 1 / (Current Time − Previous Frame Time)
+
+A higher FPS results in smoother and more responsive real-time detection.
+
+Follow-up
+
+Is higher FPS always better?
+
+No.
+
+Very high FPS increases CPU usage.
+
+The goal is to maintain stable real-time performance with acceptable resource consumption.
+
+Q38. Why doesn't your application freeze while the alarm is playing?
+Answer
+
+Because Pygame handles audio playback independently after it has been started.
+
+Once playback begins, the main thread continues processing webcam frames.
+
+This allows video capture, landmark detection, and screen updates to continue smoothly while the alarm is playing in the background.
+
+Q39. What are the biggest performance bottlenecks in your project?
+Answer
+
+The most computationally expensive components are:
+
+Neural network inference in MediaPipe.
+Continuous webcam frame capture.
+Rendering facial landmarks on every frame.
+
+In comparison, operations such as colour conversion, timer calculations, and text rendering consume very little processing time.
+
+Optimising inference provides the greatest performance improvement.
+
+Q40. If your FPS suddenly drops from 30 to 10, how would you debug it?
+Answer
+
+I would investigate the problem systematically:
+
+Measure FPS to confirm the issue.
+Check CPU and memory usage.
+Verify whether MediaPipe inference time has increased.
+Ensure the webcam resolution is not unnecessarily high.
+Check if the alarm playback or other background processes are consuming resources.
+Profile the application to identify slow functions.
+Reduce frame resolution or optimise rendering if necessary.
+
+Rather than guessing, I would profile each stage of the pipeline to identify the actual bottleneck and optimise only that component.
