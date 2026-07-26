@@ -1,0 +1,882 @@
+Complete Architecture — How Your Python Code Creates a System Tray Icon
+Goal
+
+When you run your application:
+
+SleepDetector.exe
+
+or
+
+python main.py
+
+you see this:
+
+ ------------------------------------------------------------
+| WiFi 🔊 🔋   ^                                             |
+|                👁 Sleep Detector                           |
+ ------------------------------------------------------------
+
+The question is:
+
+Who creates this icon? Python? Windows? pystray?
+
+The answer is all of them work together.
+
+Stage 1 — User Starts the Program
+
+Suppose you double-click
+
+SleepDetector.exe
+
+or press Run in VS Code.
+
+If using VS Code
+
+VS Code executes
+
+python main.py
+If using EXE
+
+Windows executes
+
+SleepDetector.exe
+
+Either way, Windows creates a process.
+
+User
+
+↓
+
+Windows Loader
+
+↓
+
+Creates Process
+
+↓
+
+Python Starts
+
+↓
+
+main.py Executes
+
+At this moment
+
+there is no tray icon.
+
+Stage 2 — Python Loads Libraries
+
+Your code begins
+
+import pystray
+from PIL import Image
+
+Python Interpreter now loads
+
+Python Interpreter
+
+↓
+
+pystray Library
+
+↓
+
+Pillow Library
+What is Pillow?
+
+Pillow (PIL)
+
+stands for
+
+Python Imaging Library
+
+Its job is
+
+Open images
+Read PNG
+Read JPG
+Read ICO
+Resize images
+Save images
+
+It does not display images.
+
+It simply understands image files.
+
+Stage 3 — Loading the Icon
+
+Suppose your code says
+
+image = Image.open("assets/icon.ico")
+
+What happens internally?
+
+Step 1
+
+Python calls Pillow.
+
+Image.open()
+
+↓
+
+Pillow
+Step 2
+
+Pillow opens
+
+assets/icon.ico
+
+from your disk.
+
+SSD
+
+↓
+
+assets
+
+↓
+
+icon.ico
+Step 3
+
+It reads the binary data.
+
+010101001
+
+101001010
+
+111010001
+Step 4
+
+It converts that into
+
+an image object.
+
+Memory now looks like
+
+RAM
+
+-----------------------
+
+Image Object
+
+Width
+
+Height
+
+Pixels
+
+Transparency
+
+Still
+
+nothing is shown on screen.
+
+Stage 4 — Creating the Tray Object
+
+Now your code says
+
+icon = pystray.Icon(
+    "Sleep Detector",
+    image,
+    menu=my_menu
+)
+
+Many beginners think
+
+the tray icon appears here.
+
+Wrong.
+
+This line only creates a Python object.
+
+Memory
+
+RAM
+
+-----------------------
+
+Tray Object
+
+↓
+
+Image
+
+↓
+
+Menu
+
+↓
+
+Callbacks
+
+Nothing is visible yet.
+
+Stage 5 — Creating the Menu
+
+Suppose
+
+menu = Menu(
+    Item("Show"),
+    Item("Exit")
+)
+
+Again
+
+no menu appears.
+
+Python simply stores
+
+Menu Object
+
+↓
+
+Show
+
+↓
+
+Exit
+
+↓
+
+Activate
+
+↓
+
+Deactivate
+Stage 6 — What is pystray?
+
+This is one of the most important concepts.
+
+Python has no built-in function that says
+
+Create tray icon
+
+because Python doesn't know how Windows works.
+
+So
+
+pystray acts as a translator.
+
+Architecture
+
+Python Code
+
+↓
+
+pystray
+
+↓
+
+Windows Shell API
+
+↓
+
+Windows Explorer
+
+↓
+
+System Tray
+
+pystray knows
+
+how to communicate with Windows.
+
+Stage 7 — The Magic Line
+
+Now you execute
+
+icon.run_detached()
+
+This is where everything begins.
+
+What does run_detached() actually do?
+
+Internally
+
+pystray does roughly this
+
+run_detached()
+
+↓
+
+Create Background Thread
+
+↓
+
+Start Message Loop
+
+↓
+
+Register Tray Icon
+
+↓
+
+Wait for Events
+
+Let's study each step.
+
+Stage 8 — Background Thread
+
+Remember
+
+Tkinter already has
+
+GUI Thread
+
+↓
+
+mainloop()
+
+If pystray used
+
+the same thread
+
+the GUI would freeze.
+
+So
+
+pystray creates
+
+another thread.
+
+Architecture
+
+Process
+
+│
+
+├──────── GUI Thread
+
+│        mainloop()
+
+│
+
+└──────── Tray Thread
+
+         Tray Loop
+
+Now
+
+GUI
+
+and
+
+Tray
+
+can both work independently.
+
+Stage 9 — Why Another Message Loop?
+
+Windows communicates
+
+using messages.
+
+Examples
+
+Mouse Click
+
+↓
+
+Right Click
+
+↓
+
+Hover
+
+↓
+
+Menu Selected
+
+↓
+
+Exit
+
+Somebody must listen.
+
+Tray Thread continuously waits.
+
+Conceptually
+
+while True
+
+↓
+
+Wait for Windows Message
+
+↓
+
+Handle It
+
+↓
+
+Wait Again
+
+Exactly like Tkinter's
+
+mainloop()
+Stage 10 — Registering with Windows
+
+Now pystray calls
+
+the Windows Shell API.
+
+Conceptually
+
+Windows,
+
+Please add this icon
+
+to the notification area.
+
+The request contains
+
+Icon Image
+
+Tooltip
+
+Menu
+
+Callbacks
+Stage 11 — Windows Shell
+
+Who receives this request?
+
+Not the kernel.
+
+Not Python.
+
+It goes to
+
+Explorer.exe
+
+Explorer.exe is
+
+the Windows Shell.
+
+It already manages
+
+Desktop
+
+Taskbar
+
+Start Menu
+
+Notification Area
+
+So Explorer says
+
+Okay.
+
+I'll display your icon.
+Stage 12 — Icon Appears
+
+Explorer copies
+
+the image
+
+into
+
+the notification area.
+
+Explorer.exe
+
+↓
+
+Notification Area
+
+↓
+
+👁
+
+Notice
+
+Python never draws
+
+the icon.
+
+Windows draws it.
+
+Stage 13 — Hovering the Mouse
+
+Suppose
+
+you move
+
+the mouse
+
+over
+
+👁
+
+Windows detects
+
+Mouse Hover
+
+Explorer checks
+
+Tooltip
+
+↓
+
+Sleep Detector
+
+Windows displays
+
+Sleep Detector
+
+Again
+
+Python didn't draw it.
+
+Windows did.
+
+Stage 14 — Right Click
+
+Suppose
+
+you right-click
+
+👁
+
+Flow
+
+Mouse
+
+↓
+
+Windows
+
+↓
+
+Explorer
+
+↓
+
+pystray
+
+↓
+
+Python Callback
+
+Suppose menu says
+
+Exit
+
+pystray executes
+
+on_exit()
+
+inside your program.
+
+Stage 15 — Show Window
+
+Suppose menu
+
+Show Window
+
+Flow
+
+Explorer
+
+↓
+
+pystray
+
+↓
+
+Callback
+
+↓
+
+GUI.show()
+
+↓
+
+Tkinter
+
+↓
+
+Windows
+
+↓
+
+Window Visible
+Stage 16 — Exit
+
+Suppose
+
+user selects
+
+Exit
+
+Flow
+
+Explorer
+
+↓
+
+pystray
+
+↓
+
+Exit Callback
+
+↓
+
+icon.stop()
+
+↓
+
+Windows Shell
+
+↓
+
+Remove Tray Icon
+
+↓
+
+Destroy Thread
+
+↓
+
+Exit Program
+
+The icon disappears immediately.
+
+Stage 17 — Complete Thread Architecture
+SleepDetector.exe
+
+↓
+
+Windows Process
+
+│
+
+├──────────── GUI Thread
+
+│
+
+│ CustomTkinter
+
+│
+
+│ mainloop()
+
+│
+
+├──────────── Detection Thread
+
+│
+
+│ OpenCV
+
+│
+
+│ MediaPipe
+
+│
+
+└──────────── Tray Thread
+
+       pystray
+
+       Message Loop
+
+       Windows Shell
+
+Three threads.
+
+One process.
+
+Stage 18 — Complete Communication Flow
+User
+
+↓
+
+Double Click EXE
+
+↓
+
+Windows Loader
+
+↓
+
+Process Created
+
+↓
+
+Python Interpreter
+
+↓
+
+main.py
+
+↓
+
+Image.open(icon.ico)
+
+↓
+
+Pillow Creates Image Object
+
+↓
+
+pystray.Icon()
+
+↓
+
+run_detached()
+
+↓
+
+Create Tray Thread
+
+↓
+
+Register Icon
+
+↓
+
+Windows Shell API
+
+↓
+
+Explorer.exe
+
+↓
+
+Notification Area
+
+↓
+
+👁 Tray Icon Appears
+Stage 19 — Libraries Used
+1. Pillow (PIL)
+
+Purpose
+
+Read icon.ico
+
+↓
+
+Create Image Object
+
+Without Pillow
+
+pystray has no image.
+
+2. pystray
+
+Purpose
+
+Python
+
+↓
+
+Windows Shell Communication
+
+Responsibilities
+
+Create tray icon
+Register menu
+Receive click events
+Remove icon
+3. threading
+
+Purpose
+
+Tray Thread
+
+↓
+
+Independent Message Loop
+
+Prevents blocking the GUI.
+
+4. Windows Shell API
+
+Purpose
+
+Manage
+
+Desktop
+
+Taskbar
+
+Notification Area
+
+Only Windows can actually display the tray icon.
+
+5. Explorer.exe
+
+Purpose
+
+Render
+
+Desktop
+
+Taskbar
+
+Tray Icon
+
+It physically draws the icon on the screen.
+
+Final Architecture Diagram
+                  User
+                    │
+      Double Click EXE / Run in VS Code
+                    │
+                    ▼
+           Windows Creates Process
+                    │
+                    ▼
+           Python Interpreter Starts
+                    │
+                    ▼
+                 main.py
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+        ▼                       ▼
+   Pillow (PIL)             pystray
+        │                       │
+        │  Reads icon.ico       │ Creates Tray Object
+        ▼                       ▼
+    Image Object         run_detached()
+                                │
+                                ▼
+                     Creates Tray Thread
+                                │
+                                ▼
+                   Windows Shell API Call
+                                │
+                                ▼
+                        Explorer.exe
+                                │
+                                ▼
+                Notification Area (System Tray)
+                                │
+                                ▼
+                     👁 Sleep Detector Icon
+                                │
+          ┌─────────────────────┴─────────────────────┐
+          │                                           │
+          ▼                                           ▼
+     Right Click                              Left Click/Hover
+          │                                           │
+          ▼                                           ▼
+     Windows Shell                             Windows Shell
+          │                                           │
+          ▼                                           ▼
+        pystray Callback                  pystray Callback
+          │                                           │
+          ▼                                           ▼
+   Your Python Function                    Your Python Function
+          │
+          ▼
+ GUI / Detector / Exit Logic
+Interview Answer (Senior Level)
+
+"The tray icon is not drawn by Python itself. My application uses the pystray library as a bridge between Python and the Windows Shell API. First, Pillow loads the .ico file into memory as an image object. Then pystray.Icon creates an internal representation of the tray icon and its context menu. When run_detached() is called, pystray starts a dedicated tray message loop on a background thread and registers the icon with the Windows Shell (Explorer.exe). Explorer is responsible for rendering the icon in the notification area and forwarding user interactions—such as clicks and menu selections—back to the registered callback functions in my Python application. This separation keeps the GUI responsive while allowing the tray icon to behave like a native Windows application."
